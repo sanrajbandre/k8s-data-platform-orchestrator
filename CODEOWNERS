@@ -1,0 +1,8 @@
+# Default owners
+* @maintainers
+
+/backend/ @maintainers/backend
+/worker/ @maintainers/worker
+/frontend/ @maintainers/frontend
+/deploy/ @maintainers/platform
+/docs/ @maintainers/docs

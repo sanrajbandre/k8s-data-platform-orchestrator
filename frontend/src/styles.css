@@ -1,0 +1,69 @@
+:root {
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: #1a1d21;
+  background: radial-gradient(circle at 0% 0%, #eef8ff 0, #f7fbff 35%, #f5f6f8 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #0c4a6e;
+  text-decoration: none;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  color: #e2e8f0;
+  padding: 24px;
+}
+
+.sidebar h1 {
+  font-size: 16px;
+}
+
+.sidebar nav {
+  display: grid;
+  gap: 10px;
+}
+
+.main {
+  padding: 28px;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+button {
+  border: 1px solid #0c4a6e;
+  background: #0e7490;
+  color: white;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+}

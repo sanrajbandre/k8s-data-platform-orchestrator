@@ -1,0 +1,37 @@
+repo_url: "https://github.com/YOUR_ORG/k8s-data-platform-orchestrator.git"
+repo_version: "main"
+app_root: "/opt/k8s-data-platform-orchestrator"
+app_user: "orchestrator"
+app_group: "orchestrator"
+
+python_version: "3.12.8"
+node_major: "20"
+
+mysql_root_socket: "/var/lib/mysql/mysql.sock"
+mysql_db_name: "orchestrator"
+mysql_app_user: "orchestrator"
+mysql_app_password: "CHANGE_ME_DB_PASSWORD"
+
+jwt_secret: "CHANGE_ME_JWT_SECRET"
+fernet_key: "CHANGE_ME_FERNET_KEY"
+openai_api_key: ""
+prometheus_base_url: "http://127.0.0.1:9090"
+
+celery_broker_url: "redis://127.0.0.1:6379/0"
+celery_result_backend: "redis://127.0.0.1:6379/1"
+
+webhook_url: ""
+slack_webhook_url: ""
+smtp_host: ""
+smtp_port: 587
+smtp_user: ""
+smtp_password: ""
+email_from: "noreply@example.local"
+
+backend_bind_host: "127.0.0.1"
+backend_bind_port: 8000
+nginx_server_name: "_"
+
+frontend_api_base_url: "/api"
+
+include_worker_with_backend_restart: true

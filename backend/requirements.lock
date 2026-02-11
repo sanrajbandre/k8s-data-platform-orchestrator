@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+alembic
+pymysql
+python-jose
+passlib[argon2]
+kubernetes
+httpx
+cryptography
+celery
+redis
+openai
+packaging

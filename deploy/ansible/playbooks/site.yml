@@ -1,0 +1,373 @@
+---
+- name: Deploy K8s Data Platform Orchestrator on Rocky Linux 9
+  hosts: orchestrator
+  become: true
+  collections:
+    - community.mysql
+  vars:
+    mysql_repo_rpm: https://dev.mysql.com/get/mysql84-community-release-el9-1.noarch.rpm
+    pyenv_root: "/home/{{ app_user }}/.pyenv"
+    pyenv_python: "{{ pyenv_root }}/versions/{{ python_version }}/bin/python"
+    backend_venv_python: "{{ app_root }}/backend/.venv/bin/python"
+    worker_venv_python: "{{ app_root }}/worker/.venv/bin/python"
+
+  pre_tasks:
+    - name: Ensure this playbook runs only on Rocky 9 family
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family == "RedHat"
+          - ansible_distribution_major_version | int == 9
+        fail_msg: "This playbook supports Rocky Linux 9.x only."
+
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - repo_url is defined
+          - repo_url | length > 0
+          - mysql_app_password is defined
+          - mysql_app_password | length > 8
+          - jwt_secret is defined
+          - jwt_secret | length > 16
+          - fernet_key is defined
+          - fernet_key | length > 30
+        fail_msg: "Set required variables in group_vars/all.yml before running deployment."
+
+  tasks:
+    - name: Install base system packages
+      ansible.builtin.dnf:
+        name:
+          - epel-release
+          - dnf-plugins-core
+          - git
+          - curl
+          - wget
+          - make
+          - rsync
+          - gcc
+          - gcc-c++
+          - openssl-devel
+          - bzip2-devel
+          - libffi-devel
+          - zlib-devel
+          - readline-devel
+          - sqlite-devel
+          - xz-devel
+          - tk-devel
+          - python3
+          - python3-pip
+          - python3-PyMySQL
+          - nginx
+          - redis
+        state: present
+
+    - name: Install MySQL community repository package
+      ansible.builtin.dnf:
+        name: "{{ mysql_repo_rpm }}"
+        state: present
+
+    - name: Ensure MySQL 8.0 community repo is enabled
+      ansible.builtin.shell: |
+        dnf config-manager --disable mysql-8.4-lts-community || true
+        dnf config-manager --enable mysql-8.0-community
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Install MySQL 8.0 server and client
+      ansible.builtin.dnf:
+        name:
+          - mysql-community-server
+          - mysql-community-client
+        state: present
+
+    - name: Check if NodeSource repo file exists
+      ansible.builtin.stat:
+        path: /etc/yum.repos.d/nodesource-el9.repo
+      register: nodesource_repo
+
+    - name: Configure NodeSource {{ node_major }} repository
+      ansible.builtin.shell: "curl -fsSL https://rpm.nodesource.com/setup_{{ node_major }}.x | bash -"
+      args:
+        executable: /bin/bash
+      when: not nodesource_repo.stat.exists
+
+    - name: Install Node.js {{ node_major }}
+      ansible.builtin.dnf:
+        name: nodejs
+        state: present
+
+    - name: Ensure application group exists
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        state: present
+
+    - name: Ensure application user exists
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        create_home: true
+        shell: /bin/bash
+        state: present
+
+    - name: Ensure application root exists
+      ansible.builtin.file:
+        path: "{{ app_root }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Checkout application repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_root }}"
+        version: "{{ repo_version }}"
+        force: true
+        update: true
+      become_user: "{{ app_user }}"
+
+    - name: Enable and start required system services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - mysqld
+        - redis
+        - nginx
+
+    - name: Ensure MySQL application database exists
+      community.mysql.mysql_db:
+        name: "{{ mysql_db_name }}"
+        state: present
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+        login_unix_socket: "{{ mysql_root_socket }}"
+
+    - name: Ensure MySQL application user exists with grants
+      community.mysql.mysql_user:
+        name: "{{ mysql_app_user }}"
+        password: "{{ mysql_app_password }}"
+        host: "localhost"
+        priv: "{{ mysql_db_name }}.*:ALL"
+        state: present
+        login_unix_socket: "{{ mysql_root_socket }}"
+
+    - name: Install pyenv for application user
+      ansible.builtin.git:
+        repo: https://github.com/pyenv/pyenv.git
+        dest: "{{ pyenv_root }}"
+        version: master
+        update: false
+      become_user: "{{ app_user }}"
+
+    - name: Ensure pyenv init is configured in .bashrc
+      ansible.builtin.blockinfile:
+        path: "/home/{{ app_user }}/.bashrc"
+        marker: "# {mark} ANSIBLE PYENV"
+        block: |
+          export PYENV_ROOT="$HOME/.pyenv"
+          export PATH="$PYENV_ROOT/bin:$PATH"
+          eval "$(pyenv init -)"
+      become_user: "{{ app_user }}"
+
+    - name: Install Python {{ python_version }} via pyenv
+      ansible.builtin.shell: |
+        export PYENV_ROOT="{{ pyenv_root }}"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)"
+        pyenv install -s {{ python_version }}
+      args:
+        executable: /bin/bash
+      become_user: "{{ app_user }}"
+
+    - name: Create backend virtual environment
+      ansible.builtin.command: "{{ pyenv_python }} -m venv {{ app_root }}/backend/.venv"
+      args:
+        creates: "{{ app_root }}/backend/.venv/bin/activate"
+      become_user: "{{ app_user }}"
+
+    - name: Install backend dependencies
+      ansible.builtin.pip:
+        name:
+          - pip
+        state: latest
+        virtualenv: "{{ app_root }}/backend/.venv"
+      become_user: "{{ app_user }}"
+
+    - name: Install backend package in editable mode
+      ansible.builtin.command: "{{ app_root }}/backend/.venv/bin/pip install -e .[dev]"
+      args:
+        chdir: "{{ app_root }}/backend"
+      become_user: "{{ app_user }}"
+
+    - name: Render backend environment file
+      ansible.builtin.template:
+        src: ../templates/backend.env.j2
+        dest: "{{ app_root }}/backend/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0640"
+      notify:
+        - restart backend
+
+    - name: Run backend Alembic migrations
+      ansible.builtin.command: "{{ app_root }}/backend/.venv/bin/alembic upgrade head"
+      args:
+        chdir: "{{ app_root }}/backend"
+      become_user: "{{ app_user }}"
+
+    - name: Seed backend defaults (roles, permissions, admin)
+      ansible.builtin.command: "{{ backend_venv_python }} -m app.db.seed"
+      args:
+        chdir: "{{ app_root }}/backend"
+      become_user: "{{ app_user }}"
+
+    - name: Create worker virtual environment
+      ansible.builtin.command: "{{ pyenv_python }} -m venv {{ app_root }}/worker/.venv"
+      args:
+        creates: "{{ app_root }}/worker/.venv/bin/activate"
+      become_user: "{{ app_user }}"
+
+    - name: Install worker package in editable mode
+      ansible.builtin.command: "{{ app_root }}/worker/.venv/bin/pip install -e .[dev]"
+      args:
+        chdir: "{{ app_root }}/worker"
+      become_user: "{{ app_user }}"
+
+    - name: Render worker environment file
+      ansible.builtin.template:
+        src: ../templates/worker.env.j2
+        dest: "{{ app_root }}/worker/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0640"
+      notify:
+        - restart worker
+        - restart beat
+
+    - name: Render frontend environment file
+      ansible.builtin.template:
+        src: ../templates/frontend.env.j2
+        dest: "{{ app_root }}/frontend/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Install frontend dependencies
+      ansible.builtin.command: npm install
+      args:
+        chdir: "{{ app_root }}/frontend"
+      become_user: "{{ app_user }}"
+
+    - name: Build frontend assets
+      ansible.builtin.command: npm run build
+      args:
+        chdir: "{{ app_root }}/frontend"
+      become_user: "{{ app_user }}"
+
+    - name: Ensure frontend target directory exists
+      ansible.builtin.file:
+        path: /usr/share/nginx/html/orchestrator
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Sync frontend build to nginx document root
+      ansible.builtin.command: >-
+        rsync -a --delete {{ app_root }}/frontend/dist/ /usr/share/nginx/html/orchestrator/
+      notify:
+        - restart nginx
+
+    - name: Install nginx site config
+      ansible.builtin.template:
+        src: ../templates/nginx-orchestrator.conf.j2
+        dest: /etc/nginx/conf.d/orchestrator.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - restart nginx
+
+    - name: Install backend systemd unit
+      ansible.builtin.template:
+        src: ../templates/orchestrator-backend.service.j2
+        dest: /etc/systemd/system/orchestrator-backend.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - reload systemd
+        - restart backend
+
+    - name: Install worker systemd unit
+      ansible.builtin.template:
+        src: ../templates/orchestrator-worker.service.j2
+        dest: /etc/systemd/system/orchestrator-worker.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - reload systemd
+        - restart worker
+
+    - name: Install beat systemd unit
+      ansible.builtin.template:
+        src: ../templates/orchestrator-beat.service.j2
+        dest: /etc/systemd/system/orchestrator-beat.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify:
+        - reload systemd
+        - restart beat
+
+    - name: Flush handlers to ensure services are up with latest config
+      ansible.builtin.meta: flush_handlers
+
+    - name: Ensure orchestrator services are enabled and started
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - orchestrator-backend
+        - orchestrator-worker
+        - orchestrator-beat
+
+    - name: Validate backend health endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ backend_bind_port }}/health"
+        return_content: true
+      register: backend_health
+      failed_when: backend_health.status != 200
+
+    - name: Show backend health response
+      ansible.builtin.debug:
+        var: backend_health.content
+
+  handlers:
+    - name: reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: restart backend
+      ansible.builtin.systemd:
+        name: orchestrator-backend
+        state: restarted
+
+    - name: restart worker
+      ansible.builtin.systemd:
+        name: orchestrator-worker
+        state: restarted
+
+    - name: restart beat
+      ansible.builtin.systemd:
+        name: orchestrator-beat
+        state: restarted
+
+    - name: restart nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted

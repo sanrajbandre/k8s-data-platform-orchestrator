@@ -1,0 +1,16 @@
+[Unit]
+Description=K8s Orchestrator Celery Beat
+After=network.target mysqld.service redis.service
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_root }}/worker
+EnvironmentFile={{ app_root }}/worker/.env
+ExecStart={{ app_root }}/worker/.venv/bin/celery -A app.celery_app beat -l INFO
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

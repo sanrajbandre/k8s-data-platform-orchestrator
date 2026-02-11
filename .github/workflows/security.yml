@@ -1,0 +1,30 @@
+name: security
+on:
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+      - run: pip install pip-audit bandit
+      - run: pip-audit -r backend/requirements.lock || true
+      - run: bandit -r backend/app worker/app
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python,javascript
+      - uses: github/codeql-action/analyze@v3
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .

@@ -1,0 +1,16 @@
+[Unit]
+Description=K8s Orchestrator Backend
+After=network.target mysqld.service redis.service
+
+[Service]
+Type=simple
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_root }}/backend
+EnvironmentFile={{ app_root }}/backend/.env
+ExecStart={{ app_root }}/backend/.venv/bin/uvicorn app.main:app --host {{ backend_bind_host }} --port {{ backend_bind_port }}
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

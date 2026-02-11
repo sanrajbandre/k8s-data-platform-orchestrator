@@ -1,0 +1,51 @@
+---
+- name: Maintenance operations for K8s Data Platform Orchestrator
+  hosts: orchestrator
+  become: true
+  vars:
+    restart_target: "all"
+    service_map:
+      all:
+        - orchestrator-backend
+        - orchestrator-worker
+        - orchestrator-beat
+        - nginx
+      backend:
+        - orchestrator-backend
+      frontend:
+        - nginx
+      worker:
+        - orchestrator-worker
+        - orchestrator-beat
+
+  tasks:
+    - name: Validate restart_target
+      ansible.builtin.assert:
+        that:
+          - restart_target in ['all', 'backend', 'frontend', 'worker']
+        fail_msg: "restart_target must be one of: all, backend, frontend, worker"
+
+    - name: Compute service restart list
+      ansible.builtin.set_fact:
+        restart_services: "{{ service_map[restart_target] }}"
+
+    - name: Optionally include worker services for backend restart
+      ansible.builtin.set_fact:
+        restart_services: "{{ restart_services + ['orchestrator-worker', 'orchestrator-beat'] }}"
+      when:
+        - restart_target == 'backend'
+        - include_worker_with_backend_restart | default(false) | bool
+
+    - name: Remove duplicate service names
+      ansible.builtin.set_fact:
+        restart_services: "{{ restart_services | unique }}"
+
+    - name: Restart selected services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ restart_services }}"
+
+    - name: Show restarted services
+      ansible.builtin.debug:
+        msg: "Restarted services: {{ restart_services | join(', ') }}"

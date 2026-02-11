@@ -1,0 +1,2 @@
+[orchestrator]
+rocky9-prod-1 ansible_host=10.10.10.20 ansible_user=rocky

@@ -1,0 +1,20 @@
+name: ci-backend
+on:
+  pull_request:
+    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
+  push:
+    branches: [main]
+    paths: ["backend/**"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e backend[dev]
+      - run: ruff check backend/app backend/tests
+      - run: mypy backend/app
+      - run: pytest -q backend/tests

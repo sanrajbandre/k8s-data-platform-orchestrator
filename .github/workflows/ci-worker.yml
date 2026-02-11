@@ -1,0 +1,20 @@
+name: ci-worker
+on:
+  pull_request:
+    paths: ["worker/**", ".github/workflows/ci-worker.yml"]
+  push:
+    branches: [main]
+    paths: ["worker/**"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e worker[dev]
+      - run: ruff check worker/app worker/tests
+      - run: mypy worker/app
+      - run: pytest -q worker/tests

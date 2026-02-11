@@ -1,0 +1,10 @@
+name: ci-e2e
+on:
+  pull_request:
+    paths: ["frontend/**", "backend/**", ".github/workflows/ci-e2e.yml"]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "E2E smoke placeholder; wire Playwright after compose integration"

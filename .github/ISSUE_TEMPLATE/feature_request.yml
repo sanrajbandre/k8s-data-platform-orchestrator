@@ -1,0 +1,16 @@
+name: Feature request
+description: Propose a feature
+labels: ["type/feature"]
+body:
+  - type: input
+    id: problem
+    attributes:
+      label: Problem statement
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
