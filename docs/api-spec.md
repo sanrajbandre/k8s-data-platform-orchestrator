@@ -54,3 +54,8 @@
 
 ## Audit
 - `GET /audit/logs`
+
+## Platform
+- `GET /platform/about`
+- `GET /platform/oss-repositories`
+- `GET /platform/learning-path`

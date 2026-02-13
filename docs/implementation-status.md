@@ -12,6 +12,9 @@
 - Phase 9: AI incident analysis endpoint + token/cost persistence + cost report API.
 - Frontend: route-guarded pages, login/token refresh client, API-driven views.
 - Rocky Linux automation: Ansible deployment + maintenance restart playbooks under `deploy/ansible`.
+- Platform identity APIs: `/platform/about`, `/platform/oss-repositories`, `/platform/learning-path`.
+- Learning UI page wired to live backend catalog endpoints.
+- OSS registry and no-code-copy policy documentation.
 
 ## Remaining hardening before production
 - Full integration and e2e tests with live MySQL/Redis/K8s test cluster.

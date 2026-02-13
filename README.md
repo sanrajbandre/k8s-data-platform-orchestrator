@@ -18,6 +18,10 @@ Open-source multi-cluster Kubernetes orchestration dashboard for Spark 4.x and K
 
 Implementation snapshot: `docs/implementation-status.md`
 
+## OSS Dependencies Used
+- Full registry and integration boundary policy: `docs/oss-repositories.md`
+- Learning + development curriculum: `docs/learning-development-track.md`
+
 ## Quick Start
 1. Copy env files:
    - `cp backend/.env.example backend/.env`

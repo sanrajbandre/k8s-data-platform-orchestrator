@@ -9,6 +9,7 @@ export function NavLayout() {
           <NavLink to="/">Cluster</NavLink>
           <NavLink to="/namespaces">Namespaces</NavLink>
           <NavLink to="/workloads">Workloads</NavLink>
+          <NavLink to="/learning">Learning</NavLink>
           <NavLink to="/spark">Spark</NavLink>
           <NavLink to="/kafka">Kafka</NavLink>
           <NavLink to="/alerts">Alerts</NavLink>

@@ -10,6 +10,7 @@ import { AIInsightsPage } from './pages/AIInsightsPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { ClusterOverviewPage } from './pages/ClusterOverviewPage';
 import { KafkaPage } from './pages/KafkaPage';
+import { LearningPage } from './pages/LearningPage';
 import { LoginPage } from './pages/LoginPage';
 import { NamespacesPage } from './pages/NamespacesPage';
 import { SparkPage } from './pages/SparkPage';
@@ -41,6 +42,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route index element={<ClusterOverviewPage />} />
             <Route path="namespaces" element={<NamespacesPage />} />
             <Route path="workloads" element={<WorkloadsPage />} />
+            <Route path="learning" element={<LearningPage />} />
             <Route path="spark" element={<RequirePerm perm="spark.deploy"><SparkPage /></RequirePerm>} />
             <Route path="kafka" element={<RequirePerm perm="kafka.deploy"><KafkaPage /></RequirePerm>} />
             <Route path="alerts" element={<RequirePerm perm="alerts.manage"><AlertsPage /></RequirePerm>} />
