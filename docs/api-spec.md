@@ -19,6 +19,9 @@
 - `GET /clusters`
 - `POST /clusters`
 - `GET /clusters/{cluster_id}/namespaces`
+- `GET /clusters/{cluster_id}/namespace-policies`
+- `POST /clusters/{cluster_id}/namespace-policies`
+- `DELETE /clusters/{cluster_id}/namespace-policies/{scope_id}`
 
 ## Kubernetes
 - `GET /k8s/{cluster_id}/workloads`
@@ -34,6 +37,11 @@
 ## Services
 - Spark: templates + CRUD + status `/services/spark/*`
 - Kafka: templates + CRUD + status + migration assistant `/services/kafka/*`
+
+## Orchestration
+- `POST /orchestration/intents/{intent_id}/apply`
+- `GET /orchestration/intents/{intent_id}/runs`
+- `GET /orchestration/runs/{run_id}`
 
 ## Metrics
 - `GET /metrics/query`

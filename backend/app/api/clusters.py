@@ -7,8 +7,8 @@ from app.core.config import get_settings
 from app.core.crypto import SecretCrypto
 from app.core.deps import get_current_user, get_db
 from app.core.rbac import require_perm
-from app.db.models import Cluster, User
-from app.db.schemas import ClusterCreate, ClusterOut
+from app.db.models import Cluster, User, UserNamespaceScope
+from app.db.schemas import ClusterCreate, ClusterOut, NamespacePolicyCreate, NamespacePolicyOut
 from app.k8s.client import api_client_from_kubeconfig, core_v1
 from app.k8s.utils import parse_kubeconfig
 
@@ -81,3 +81,115 @@ def list_namespaces(cluster_id: int, db: Session = Depends(get_db)) -> dict:
         return {"items": [r.metadata.name for r in rows]}
     except Exception:
         return {"items": [], "warning": "Failed to connect cluster with provided kubeconfig"}
+
+
+@router.get(
+    "/{cluster_id}/namespace-policies",
+    response_model=list[NamespacePolicyOut],
+    dependencies=[Depends(require_perm("admin.rbac.read"))],
+)
+def list_namespace_policies(cluster_id: int, db: Session = Depends(get_db)) -> list[NamespacePolicyOut]:
+    cluster = db.scalar(select(Cluster).where(Cluster.id == cluster_id))
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+
+    rows = db.scalars(
+        select(UserNamespaceScope)
+        .where(UserNamespaceScope.cluster_id == cluster_id)
+        .order_by(UserNamespaceScope.namespace.asc(), UserNamespaceScope.user_id.asc())
+    ).all()
+    return [NamespacePolicyOut.model_validate(row) for row in rows]
+
+
+@router.post(
+    "/{cluster_id}/namespace-policies",
+    response_model=NamespacePolicyOut,
+    dependencies=[Depends(require_perm("admin.rbac.write"))],
+)
+def upsert_namespace_policy(
+    cluster_id: int,
+    payload: NamespacePolicyCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+) -> NamespacePolicyOut:
+    cluster = db.scalar(select(Cluster).where(Cluster.id == cluster_id))
+    if not cluster:
+        raise HTTPException(status_code=404, detail="Cluster not found")
+    if db.scalar(select(User).where(User.id == payload.user_id)) is None:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    scope = db.scalar(
+        select(UserNamespaceScope).where(
+            UserNamespaceScope.cluster_id == cluster_id,
+            UserNamespaceScope.user_id == payload.user_id,
+            UserNamespaceScope.namespace == payload.namespace,
+        )
+    )
+    if scope is None:
+        scope = UserNamespaceScope(
+            user_id=payload.user_id,
+            cluster_id=cluster_id,
+            namespace=payload.namespace,
+            allowed_actions={"actions": payload.allowed_actions},
+            denied_actions={"actions": payload.denied_actions},
+        )
+        db.add(scope)
+    else:
+        scope.allowed_actions = {"actions": payload.allowed_actions}
+        scope.denied_actions = {"actions": payload.denied_actions}
+
+    db.commit()
+    db.refresh(scope)
+    append_audit(
+        db,
+        actor=actor,
+        action="cluster.namespace_policy.upsert",
+        resource_kind="namespace_policy",
+        resource_id=str(scope.id),
+        diff_json={
+            "cluster_id": cluster_id,
+            "user_id": payload.user_id,
+            "namespace": payload.namespace,
+            "allowed_actions": payload.allowed_actions,
+            "denied_actions": payload.denied_actions,
+        },
+        outcome="success",
+        request=request,
+    )
+    return NamespacePolicyOut.model_validate(scope)
+
+
+@router.delete(
+    "/{cluster_id}/namespace-policies/{scope_id}",
+    dependencies=[Depends(require_perm("admin.rbac.write"))],
+)
+def delete_namespace_policy(
+    cluster_id: int,
+    scope_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+) -> dict:
+    scope = db.scalar(
+        select(UserNamespaceScope).where(
+            UserNamespaceScope.id == scope_id,
+            UserNamespaceScope.cluster_id == cluster_id,
+        )
+    )
+    if scope is None:
+        raise HTTPException(status_code=404, detail="Namespace policy not found")
+
+    db.delete(scope)
+    db.commit()
+    append_audit(
+        db,
+        actor=actor,
+        action="cluster.namespace_policy.delete",
+        resource_kind="namespace_policy",
+        resource_id=str(scope_id),
+        diff_json={"cluster_id": cluster_id},
+        outcome="success",
+        request=request,
+    )
+    return {"status": "deleted"}

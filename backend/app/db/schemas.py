@@ -72,6 +72,24 @@ class ClusterOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NamespacePolicyCreate(BaseModel):
+    user_id: int
+    namespace: str
+    allowed_actions: list[str] = Field(default_factory=list)
+    denied_actions: list[str] = Field(default_factory=list)
+
+
+class NamespacePolicyOut(BaseModel):
+    id: int
+    user_id: int
+    cluster_id: int
+    namespace: str
+    allowed_actions: dict[str, list[str]]
+    denied_actions: dict[str, list[str]]
+
+    model_config = {"from_attributes": True}
+
+
 class ScaleRequest(BaseModel):
     replicas: int = Field(ge=0, le=500)
 
@@ -91,6 +109,19 @@ class ResourceIntentOut(BaseModel):
     spec_json: dict[str, Any]
     status: str
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ResourceRunOut(BaseModel):
+    id: int
+    intent_id: int
+    action: str
+    started_at: datetime
+    ended_at: datetime | None
+    result: str
+    logs_ref: str | None
+    retry_count: int
 
     model_config = {"from_attributes": True}
 

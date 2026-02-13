@@ -4,9 +4,11 @@
 - Phase 0: monorepo structure, docs skeleton, OSS governance files, CI workflow scaffolding.
 - Phase 1: JWT auth, RBAC tables/models, permission dependencies, audit log appenders, seed script.
 - Phase 2: multi-cluster registry with encrypted kubeconfig storage and namespace scope model.
+- Phase 2 extension: namespace policy management APIs per cluster (`/clusters/{id}/namespace-policies`).
 - Phase 3-4: K8s explorer endpoints + key safe actions (scale, rollout restart, delete pod, cordon/drain stub).
 - Phase 5: SparkApplication intent CRUD + status endpoint.
 - Phase 6: Kafka dual-mode intent CRUD + strict compatibility checks + migration assistant endpoint.
+- Orchestration control: intent apply queue endpoint + run history/status APIs backed by Celery run tracking.
 - Phase 7: Prometheus query/range + dashboard aggregation endpoints.
 - Phase 8: Alert rules API + worker scheduler evaluation + notifications (webhook/slack/email).
 - Phase 9: AI incident analysis endpoint + token/cost persistence + cost report API.

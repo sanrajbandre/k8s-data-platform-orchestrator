@@ -14,7 +14,7 @@ class PermissionDenied(HTTPException):
         super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
 
-def _user_permission_set(db: Session, user_id: int) -> set[str]:
+def user_permission_set(db: Session, user_id: int) -> set[str]:
     stmt = (
         select(Permission.name)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
@@ -24,14 +24,47 @@ def _user_permission_set(db: Session, user_id: int) -> set[str]:
     return {row[0] for row in db.execute(stmt).all()}
 
 
+def _user_permission_set(db: Session, user_id: int) -> set[str]:
+    # Backward-compatible alias for modules already importing the private helper.
+    return user_permission_set(db, user_id)
+
+
+def has_any_permission(granted: set[str], required: tuple[str, ...] | list[str]) -> bool:
+    if "admin.all" in granted:
+        return True
+    return any(permission in granted for permission in required)
+
+
+def ensure_any_permission(granted: set[str], required: tuple[str, ...] | list[str]) -> None:
+    if has_any_permission(granted, required):
+        return
+    expected = ", ".join(required)
+    raise PermissionDenied(f"Missing permission. One of [{expected}] is required")
+
+
 def require_perm(permission: str) -> Callable:
     def _dep(
         user: UserModel = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> UserModel:
-        perms = _user_permission_set(db, user.id)
-        if permission not in perms and "admin.all" not in perms:
-            raise PermissionDenied(f"Missing permission: {permission}")
+        perms = user_permission_set(db, user.id)
+        ensure_any_permission(perms, (permission,))
+        return user
+
+    return _dep
+
+
+def require_any_perm(*permissions: str) -> Callable:
+    normalized = tuple(dict.fromkeys(permissions))
+    if not normalized:
+        raise ValueError("At least one permission must be provided")
+
+    def _dep(
+        user: UserModel = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> UserModel:
+        perms = user_permission_set(db, user.id)
+        ensure_any_permission(perms, normalized)
         return user
 
     return _dep
